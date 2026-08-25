@@ -1,0 +1,229 @@
+
+
+from pathlib import Path
+
+import cv2
+import numpy as np
+from PIL import Image
+import matplotlib.pyplot as plt
+
+
+# ==========================================================
+# 경로
+# ==========================================================
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+INPUT_IMAGE = (
+    PROJECT_ROOT
+    / "finetune_data"
+    / "images"
+    / "EKG.png"
+)
+
+OUTPUT_DIR = (
+    PROJECT_ROOT
+    / "finetune_data"
+    / "mask_debug"
+)
+
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ==========================================================
+# 실행
+# ==========================================================
+
+def main():
+
+    image = cv2.imread(str(INPUT_IMAGE))
+
+    if image is None:
+        raise FileNotFoundError(INPUT_IMAGE)
+
+    height, width = image.shape[:2]
+
+    print("이미지 크기:", width, "x", height)
+
+    # ------------------------------------------------------
+    # 1. 검은색 계열 픽셀 검출
+    # ------------------------------------------------------
+
+    gray = cv2.cvtColor(
+        image,
+        cv2.COLOR_BGR2GRAY
+    )
+
+    dark_mask = np.where(
+        gray < 100,
+        255,
+        0
+    ).astype(np.uint8)
+
+    # ------------------------------------------------------
+    # 2. 좌우 가장자리 제외
+    # ------------------------------------------------------
+
+    x1 = int(width * 0.07)
+    x2 = int(width * 0.98)
+
+    analysis_mask = dark_mask[:, x1:x2]
+
+    # ------------------------------------------------------
+    # 3. Y축별 검은 픽셀 양 계산
+    # ------------------------------------------------------
+
+    row_score = (
+        analysis_mask > 0
+    ).sum(axis=1).astype(float)
+
+    kernel_size = 21
+
+    kernel = (
+        np.ones(kernel_size)
+        / kernel_size
+    )
+
+    smoothed_score = np.convolve(
+        row_score,
+        kernel,
+        mode="same"
+    )
+
+    # ------------------------------------------------------
+    # 4. 너무 위/아래 영역 제외
+    #
+    # 상단 여백과 하단 기기 정보의 영향 감소
+    # ------------------------------------------------------
+
+    search_top = int(height * 0.10)
+    search_bottom = int(height * 0.88)
+
+    # ------------------------------------------------------
+    # 5. 봉우리 후보 찾기
+    #
+    # 가장 점수가 높은 위치부터 선택하되,
+    # 서로 너무 가까운 위치는 같은 ECG 행으로 간주
+    # ------------------------------------------------------
+
+    candidate_indices = np.argsort(
+        smoothed_score[search_top:search_bottom]
+    )[::-1]
+
+    candidate_indices = (
+        candidate_indices
+        + search_top
+    )
+
+    min_distance = int(
+        height * 0.12
+    )
+
+    detected_rows = []
+
+    for y in candidate_indices:
+
+        y = int(y)
+
+        if all(
+            abs(y - existing_y) >= min_distance
+            for existing_y in detected_rows
+        ):
+            detected_rows.append(y)
+
+        # 표준 3행 + rhythm strip까지
+        # 최대 4개의 주요 행을 찾음
+        if len(detected_rows) == 4:
+            break
+
+    detected_rows.sort()
+
+    print()
+    print("자동 검출된 ECG 행:")
+    print(detected_rows)
+
+    # ------------------------------------------------------
+    # 6. 원본 이미지에 검출 위치 표시
+    # ------------------------------------------------------
+
+    preview = image.copy()
+
+    for number, y in enumerate(
+        detected_rows,
+        start=1
+    ):
+
+        cv2.line(
+            preview,
+            (0, y),
+            (width - 1, y),
+            (0, 255, 0),
+            3
+        )
+
+        cv2.putText(
+            preview,
+            f"ROW {number}  y={y}",
+            (15, max(30, y - 10)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 0, 0),
+            2,
+            cv2.LINE_AA
+        )
+
+    # ------------------------------------------------------
+    # 7. 결과 저장
+    # ------------------------------------------------------
+
+    preview_path = (
+        OUTPUT_DIR
+        / "03_detected_rows.png"
+    )
+
+    cv2.imwrite(
+        str(preview_path),
+        preview
+    )
+
+    # 그래프에도 검출 위치 표시
+    plt.figure(figsize=(10, 8))
+
+    plt.plot(
+        smoothed_score,
+        np.arange(height)
+    )
+
+    for y in detected_rows:
+        plt.axhline(
+            y=y,
+            linestyle="--"
+        )
+
+    plt.gca().invert_yaxis()
+
+    plt.xlabel("Dark pixel score")
+    plt.ylabel("Image Y coordinate")
+    plt.title("Detected ECG Rows")
+    plt.grid()
+
+    graph_path = (
+        OUTPUT_DIR
+        / "03_detected_rows_graph.png"
+    )
+
+    plt.tight_layout()
+    plt.savefig(
+        graph_path,
+        dpi=180
+    )
+    plt.close()
+
+    print()
+    print("완료")
+    print("미리보기:", preview_path)
+    print("그래프:", graph_path)
+
+
+if __name__ == "__main__":
+    main()
