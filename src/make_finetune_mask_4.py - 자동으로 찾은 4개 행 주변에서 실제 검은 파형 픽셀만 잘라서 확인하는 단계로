@@ -1,0 +1,224 @@
+from pathlib import Path
+
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+# ==========================================================
+# 경로
+# ==========================================================
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+INPUT_IMAGE = (
+    PROJECT_ROOT
+    / "finetune_data"
+    / "images"
+    / "EKG.png"
+)
+
+OUTPUT_DIR = (
+    PROJECT_ROOT
+    / "finetune_data"
+    / "mask_debug"
+)
+
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ==========================================================
+# 실행
+# ==========================================================
+
+def main():
+
+    image = cv2.imread(str(INPUT_IMAGE))
+
+    if image is None:
+        raise FileNotFoundError(INPUT_IMAGE)
+
+    height, width = image.shape[:2]
+
+    print("이미지 크기:", width, "x", height)
+
+    # ======================================================
+    # 1. 검은색 계열 픽셀 검출
+    # ======================================================
+
+    gray = cv2.cvtColor(
+        image,
+        cv2.COLOR_BGR2GRAY
+    )
+
+    dark_mask = np.where(
+        gray < 100,
+        255,
+        0
+    ).astype(np.uint8)
+
+    # ======================================================
+    # 2. ECG 행 자동 검출
+    # ======================================================
+
+    x1 = int(width * 0.07)
+    x2 = int(width * 0.98)
+
+    analysis_mask = dark_mask[:, x1:x2]
+
+    row_score = (
+        analysis_mask > 0
+    ).sum(axis=1).astype(float)
+
+    kernel_size = 21
+
+    kernel = (
+        np.ones(kernel_size)
+        / kernel_size
+    )
+
+    smoothed_score = np.convolve(
+        row_score,
+        kernel,
+        mode="same"
+    )
+
+    search_top = int(height * 0.10)
+    search_bottom = int(height * 0.88)
+
+    candidate_indices = np.argsort(
+        smoothed_score[search_top:search_bottom]
+    )[::-1]
+
+    candidate_indices = (
+        candidate_indices
+        + search_top
+    )
+
+    min_distance = int(
+        height * 0.12
+    )
+
+    detected_rows = []
+
+    for y in candidate_indices:
+
+        y = int(y)
+
+        if all(
+            abs(y - existing_y) >= min_distance
+            for existing_y in detected_rows
+        ):
+            detected_rows.append(y)
+
+        if len(detected_rows) == 4:
+            break
+
+    detected_rows.sort()
+
+    print("자동 검출된 ECG 행:", detected_rows)
+
+    # ======================================================
+    # 3. 각 ECG 행 주변을 자동으로 잘라냄
+    # ======================================================
+
+    # 행 간격을 이용해서 crop 높이 결정
+    if len(detected_rows) >= 2:
+
+        row_gaps = np.diff(detected_rows)
+
+        median_gap = float(
+            np.median(row_gaps)
+        )
+
+    else:
+        median_gap = height * 0.20
+
+    half_height = int(
+        median_gap * 0.35
+    )
+
+    print("행 crop 반높이:", half_height)
+
+    # ======================================================
+    # 4. 결과를 한 장에 표시
+    # ======================================================
+
+    fig, axes = plt.subplots(
+        len(detected_rows),
+        1,
+        figsize=(16, 10)
+    )
+
+    if len(detected_rows) == 1:
+        axes = [axes]
+
+    for index, y in enumerate(detected_rows):
+
+        y_top = max(
+            0,
+            y - half_height
+        )
+
+        y_bottom = min(
+            height,
+            y + half_height
+        )
+
+        # 좌우 가장자리의 calibration pulse 영향 감소
+        crop = dark_mask[
+            y_top:y_bottom,
+            x1:x2
+        ]
+
+        axes[index].imshow(
+            crop,
+            cmap="gray"
+        )
+
+        axes[index].set_title(
+            f"Detected ECG Row {index + 1}"
+        )
+
+        axes[index].axis("off")
+
+        # 개별 파일도 저장
+        row_path = (
+            OUTPUT_DIR
+            / f"04_row_{index + 1}.png"
+        )
+
+        cv2.imwrite(
+            str(row_path),
+            crop
+        )
+
+        print(
+            f"ROW {index + 1}:",
+            f"y={y}",
+            f"범위={y_top}:{y_bottom}",
+            "->",
+            row_path
+        )
+
+    plt.tight_layout()
+
+    combined_path = (
+        OUTPUT_DIR
+        / "04_extracted_rows.png"
+    )
+
+    plt.savefig(
+        combined_path,
+        dpi=180,
+        bbox_inches="tight"
+    )
+
+    plt.close()
+
+    print()
+    print("완료:", combined_path)
+
+
+if __name__ == "__main__":
+    main()
