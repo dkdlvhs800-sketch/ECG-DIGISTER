@@ -1,0 +1,5 @@
+EKG_cropped 4 500 5000
+EKG_cropped.dat 16 1000.0(0)/mV 16 0 0 21533 0 II
+EKG_cropped.dat 16 1000.0(0)/mV 16 0 0 43395 0 V4
+EKG_cropped.dat 16 1000.0(0)/mV 16 0 1304 37800 0 V5
+EKG_cropped.dat 16 1000.0(0)/mV 16 0 0 63461 0 V6

@@ -1,0 +1,4 @@
+EKG_layout_v2 3 500 5000
+EKG_layout_v2.dat 16 1000.0(0)/mV 16 0 -493 60688 0 II
+EKG_layout_v2.dat 16 1000.0(0)/mV 16 0 0 16172 0 V4
+EKG_layout_v2.dat 16 1000.0(0)/mV 16 0 0 23549 0 V5

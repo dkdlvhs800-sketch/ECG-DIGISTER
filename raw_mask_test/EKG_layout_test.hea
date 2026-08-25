@@ -1,0 +1,4 @@
+EKG_layout_test 3 500 5000
+EKG_layout_test.dat 16 1000.0(0)/mV 16 0 1662 64361 0 II
+EKG_layout_test.dat 16 1000.0(0)/mV 16 0 0 19486 0 V5
+EKG_layout_test.dat 16 1000.0(0)/mV 16 0 593 21894 0 V6

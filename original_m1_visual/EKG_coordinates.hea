@@ -1,0 +1,13 @@
+EKG_coordinates 12 500 5000
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 -479 33368 0 I
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 990 22699 0 II
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 0 58039 0 III
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 0 31223 0 aVR
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 -939 30267 0 aVL
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 0 46098 0 aVF
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 -462 1451 0 V1
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 -308 3689 0 V2
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 -147 1980 0 V3
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 0 2584 0 V4
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 -311 2669 0 V5
+EKG_coordinates.dat 16 1000.0(0)/mV 16 0 -144 3686 0 V6
