@@ -1,0 +1,157 @@
+
+
+from pathlib import Path
+
+import cv2
+import numpy as np
+from PIL import Image
+import matplotlib.pyplot as plt
+
+
+# ==========================================================
+# 경로
+# ==========================================================
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+INPUT_IMAGE = (
+    PROJECT_ROOT
+    / "finetune_data"
+    / "images"
+    / "EKG.png"
+)
+
+OUTPUT_DIR = (
+    PROJECT_ROOT
+    / "finetune_data"
+    / "mask_debug"
+)
+
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ==========================================================
+# 실행
+# ==========================================================
+
+def main():
+
+    # 1. 이미지 읽기
+    image = cv2.imread(str(INPUT_IMAGE))
+
+    if image is None:
+        raise FileNotFoundError(INPUT_IMAGE)
+
+    height, width = image.shape[:2]
+
+    print("이미지 크기:", width, "x", height)
+
+    # ------------------------------------------------------
+    # 2. 회색조 변환
+    # ------------------------------------------------------
+
+    gray = cv2.cvtColor(
+        image,
+        cv2.COLOR_BGR2GRAY
+    )
+
+    # ------------------------------------------------------
+    # 3. 매우 어두운 픽셀만 선택
+    #
+    # 빨간 ECG grid보다 검은 ECG 파형이 훨씬 어두운 점 이용
+    # ------------------------------------------------------
+
+    dark_mask = np.where(
+        gray < 100,
+        255,
+        0
+    ).astype(np.uint8)
+
+    # ------------------------------------------------------
+    # 4. 좌우 가장자리 제외
+    #
+    # calibration pulse / 테두리 등의 영향 감소
+    # ------------------------------------------------------
+
+    x1 = int(width * 0.07)
+    x2 = int(width * 0.98)
+
+    analysis_mask = dark_mask[:, x1:x2]
+
+    # ------------------------------------------------------
+    # 5. 각 Y 위치에 검은 픽셀이 얼마나 있는지 계산
+    # ------------------------------------------------------
+
+    row_score = (
+        analysis_mask > 0
+    ).sum(axis=1).astype(float)
+
+    # 부드럽게 만들기
+    kernel_size = 21
+
+    kernel = (
+        np.ones(kernel_size)
+        / kernel_size
+    )
+
+    smoothed_score = np.convolve(
+        row_score,
+        kernel,
+        mode="same"
+    )
+
+    # ------------------------------------------------------
+    # 6. 결과 그래프 저장
+    # ------------------------------------------------------
+
+    plt.figure(figsize=(10, 8))
+
+    plt.plot(
+        smoothed_score,
+        np.arange(height)
+    )
+
+    plt.gca().invert_yaxis()
+
+    plt.xlabel("Dark pixel score")
+    plt.ylabel("Image Y coordinate")
+
+    plt.title(
+        "Automatic ECG Row Detection"
+    )
+
+    plt.grid()
+
+    graph_path = (
+        OUTPUT_DIR
+        / "02_row_detection.png"
+    )
+
+    plt.tight_layout()
+    plt.savefig(
+        graph_path,
+        dpi=180
+    )
+    plt.close()
+
+    # ------------------------------------------------------
+    # 7. 검은 픽셀 mask도 저장
+    # ------------------------------------------------------
+
+    mask_path = (
+        OUTPUT_DIR
+        / "02_dark_pixels.png"
+    )
+
+    Image.fromarray(
+        dark_mask
+    ).save(mask_path)
+
+    print()
+    print("완료")
+    print("검은 픽셀:", mask_path)
+    print("행 분석:", graph_path)
+
+
+if __name__ == "__main__":
+    main()
